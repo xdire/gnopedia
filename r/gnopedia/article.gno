@@ -13,8 +13,8 @@ var articles = uintavl.NewTree()
 
 type Article struct {
 	ID                       uint64
-	MinMajority              uint64 // define minimal majority for the article to have the version to replace previous version
-	VotingGracePeriod        uint64 // seconds for graceful voting, allows to accumulate version votes without version update
+	MinMajority              uint32 // define minimal majority for the article to have the version to replace previous version
+	VotingGracePeriod        uint32 // seconds for graceful voting, allows to accumulate version votes without version update
 	MinVersionContribCost    int    // the contribution size author need to put on stake to create version of article
 	Title                    string
 	Versions                 []*ArticleContent // defined as a slice, however depending on storage optimizations can (should) be tree, LL or the Queue type (Recent first)
@@ -29,7 +29,7 @@ type Article struct {
 // @param cc Contribution Cost — the stake of the new Article versions to be posted for review
 // @param title Title of the article
 // @param text Content of the article version
-func NewArticle(minMajority, gracePeriod uint64, contribCost int, title, text string) uint64 {
+func NewArticle(minMajority, gracePeriod uint32, contribCost int, title, text string) uint64 {
 	author := std.PrevRealm().Addr()
 
 	var reward std.Coins
@@ -52,6 +52,7 @@ func NewArticle(minMajority, gracePeriod uint64, contribCost int, title, text st
 				Declined:  nil,
 				Reward:    reward,
 				Text:      text,
+				Title:     title,
 				CreatedAt: time.Now().UTC(),
 			},
 		},
@@ -194,7 +195,7 @@ func getArticle(id uint64) *Article {
 
 func canPromoteVersion(article *Article, version *ArticleContent) bool {
 	if time.Now().Sub(version.CreatedAt).Milliseconds() > int64(article.VotingGracePeriod) {
-		if uint64(len(version.Approved)-len(version.Declined)) > article.MinMajority {
+		if uint32(len(version.Approved)-len(version.Declined)) > article.MinMajority {
 			return true
 		}
 	}
@@ -203,7 +204,7 @@ func canPromoteVersion(article *Article, version *ArticleContent) bool {
 
 func canDemoteVersion(article *Article, version *ArticleContent) bool {
 	// Check if this article is actual current article at the moment
-	if uint64(article.CurrentVersion) == version.VersionID && uint64(len(version.Declined)-len(version.Approved)) > article.MinMajority {
+	if uint64(article.CurrentVersion) == version.VersionID && uint32(len(version.Declined)-len(version.Approved)) > article.MinMajority {
 		return true
 	}
 	return false

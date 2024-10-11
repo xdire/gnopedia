@@ -17,12 +17,19 @@ type Article struct {
 	VotingGracePeriod        uint64 // seconds for graceful voting, allows to accumulate version votes without version update
 	MinVersionContribCost    int    // the contribution size author need to put on stake to create version of article
 	Title                    string
-	Versions                 []*ArticleContent // defined as a slice, however depending on storage optimizations can be tree
+	Versions                 []*ArticleContent // defined as a slice, however depending on storage optimizations can (should) be tree, LL or the Queue type (Recent first)
 	CurrentVersion           int
 	CurrentVersionInDisprove bool
 }
 
-func NewArticle(mm, gp uint64, cc int, title, text string) uint64 {
+// NewArticle Create new article
+// Note: it seems variable names here not important for the gnokey documentation, can be descriptive names
+// @param mm Minimal Majority required between Approver and Rejection votes
+// @param gp Voting Grace period in seconds, meaning no promotion allowed until this period ends
+// @param cc Contribution Cost — the stake of the new Article versions to be posted for review
+// @param title Title of the article
+// @param text Content of the article version
+func NewArticle(minMajority, gracePeriod uint64, contribCost int, title, text string) uint64 {
 	author := std.PrevRealm().Addr()
 
 	var reward std.Coins
@@ -33,9 +40,9 @@ func NewArticle(mm, gp uint64, cc int, title, text string) uint64 {
 	id := uint64(articles.Size())
 	a := &Article{
 		ID:                    id,
-		MinMajority:           mm,
-		VotingGracePeriod:     gp,
-		MinVersionContribCost: cc,
+		MinMajority:           minMajority,
+		VotingGracePeriod:     gracePeriod,
+		MinVersionContribCost: contribCost,
 		Title:                 title,
 		Versions: []*ArticleContent{
 			{
@@ -52,7 +59,6 @@ func NewArticle(mm, gp uint64, cc int, title, text string) uint64 {
 	}
 
 	if storErr := articles.Set(id, a); storErr {
-		// This should never happen.
 		panic("cannot use article ID")
 	}
 
@@ -100,6 +106,8 @@ func UpdateArticleVersion(id, version uint64, title, text string) {
 	ver.Text = text
 }
 
+// ApproveArticleVersion
+// Abstract user can approve content version adding some stake to the author reward
 func ApproveArticleVersion(id, version uint64) {
 	currentUser := std.PrevRealm().Addr()
 
@@ -139,6 +147,11 @@ func ApproveArticleVersion(id, version uint64) {
 	}
 }
 
+// DenyArticleVersion
+// Abstract user can provide a rejection to the article version increasing the reward for author
+// to rewrite the article in a better way
+// For the already promoted articles it is possible that they can get to the rejection phase where
+// additional information will be shown in the UI in regards that content should be carefully reviewed
 func DenyArticleVersion(id, version uint64) {
 	currentUser := std.PrevRealm().Addr()
 
